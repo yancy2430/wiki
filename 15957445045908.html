@@ -87,16 +87,6 @@
           
             <li><a title="已有docker安装kubelet" href="15941929689104.html">已有docker安装kubelet</a></li>
           
-            <li><a title="加入集群" href="15941870406374.html">加入集群</a></li>
-          
-
-      
-        <li class="divider"></li>
-        <li><label>kafka</label></li>
-
-          
-            <li><a title="查看kafka偏移量" href="15942786116796.html">查看kafka偏移量</a></li>
-          
 
       
       </ul>
@@ -149,14 +139,6 @@
                       <li class="side-title"><span>kubernetes</span></li>
                         
                           <li><a title="已有docker安装kubelet" href="15941929689104.html">已有docker安装kubelet</a></li>
-                        
-                          <li><a title="加入集群" href="15941870406374.html">加入集群</a></li>
-                        
-
-                    
-                      <li class="side-title"><span>kafka</span></li>
-                        
-                          <li><a title="查看kafka偏移量" href="15942786116796.html">查看kafka偏移量</a></li>
                         
 
                     
@@ -263,16 +245,15 @@ rocketmq.name-server=192.168.2.54:9876 #rocketmq服务地址
 public class PlaceServiceImpl implements PlaceListener {
     @Override
     public R place(Reserve reserve) {
-        return R.ok(map);//返回预定结果
+        return R.ok(map);//返回预定结果 一般结果为航司返回原文
     }
 }
 
 </code></pre>
 
-<h4 id="toc_5">预定参数说明</h4>
+<h4 id="toc_5"><span id="Reserve">预定参数说明</span></h4>
 
-<pre><code class="language-java">
-@ToString
+<pre><code class="language-java">@ToString
 @Data
 @Accessors(chain = true)
 public class Reserve {
@@ -387,13 +368,13 @@ public class Reserve {
 public class PayServiceImpl implements PayListener {
     @Override
     public R pay(Payment payment) {
-        return R.ok(map);//返回预定结果
+        return R.ok(map);//返回支付结果 一般结果为航司返回原文
     }
 }
 
 </code></pre>
 
-<h4 id="toc_7">支付参数说明</h4>
+<h4 id="toc_7"><span id="Payment">支付参数说明</span></h4>
 
 <pre><code class="language-java">
 @ToString
@@ -432,13 +413,13 @@ public class Payment {
 public class PayServiceImpl implements PayListener {
     @Override
     public R ticket(Ticket ticket) {
-        return R.ok(map);//返回预定结果
+        return R.ok(map);//返回票号结果 一般结果为航司返回原文
     }
 }
 
 </code></pre>
 
-<h2 id="toc_9">票号参数实体说明</h2>
+<h2 id="toc_9"><span id="Ticket">票号参数实体说明</span></h2>
 
 <pre><code class="language-java">@Data
 @Accessors(chain = true)
@@ -469,10 +450,154 @@ public class Ticket {
 
 <h1 id="toc_10">后台修改</h1>
 
-<p>在upu跟目录下的bingo_b2b_deal_with.php文件新增</p>
+<p>在upu跟目录下的bingo_b2b_deal_with.php文件新增接收结果回调通知代码</p>
+
+<h2 id="toc_11">接收结果回调</h2>
+
+<p>回调通知地址</p>
+
+<pre><code class="language-text"># 预定通知地址
+http://120.78.91.205:8251/bingo_b2b_deal_with.php?action=set_chb2b_PlaceOrder&amp;airline={航司二字码}
+
+# 支付通知地址
+http://120.78.91.205:8251/bingo_b2b_deal_with.php?action=set_chb2b_Pay&amp;airline={航司二字码}
+
+# 获取票号通知地址
+http://120.78.91.205:8251/bingo_b2b_deal_with.php?action=set_chb2b_Ticket&amp;airline={航司二字码}
+</code></pre>
+
+<p>通知地址返回 0 或 HTTP状态200为通知成功 否则失败<br/>
+失败后会重复通知 第一次重复间隔 5秒 第二次 10秒 ... 通知5次 如一直不成功则去MQ查看死信队列</p>
+
+<h4 id="toc_12">统一通知json结构</h4>
+
+<pre><code class="language-javascript">{
+    &quot;code&quot;:0,//0 成功 其他为失败 
+    &quot;data&quot;:{//航司返回数据结构 由后台解析
+        &quot;customerRrequestNo&quot;:&quot;2020072921324593&quot;,
+        &quot;bizStatus&quot;:&quot;SUCCESS&quot;,
+        &quot;sendSmsType&quot;:&quot;MESSAGE&quot;,
+        &quot;phoneNo&quot;:&quot;18973127715&quot;,
+        &quot;token&quot;:&quot;2007291439321106236&quot;
+    },
+    &quot;msg&quot;:&quot;处理成功&quot;,//结果内容
+    &quot;param&quot;:{//预定的请求参数
+        &quot;id&quot;:&quot;1883153&quot;,
+        &quot;account&quot;:&quot;18846234331&quot;,
+        &quot;password&quot;:&quot;wsk190120&quot;,
+        &quot;orderId&quot;:&quot;WAUGHR&quot;,
+        &quot;channelInfo&quot;:{
+            &quot;cardNo&quot;:&quot;4910321596004767&quot;,
+            &quot;cvv&quot;:&quot;072&quot;,
+            &quot;expiryDate&quot;:&quot;0725&quot;,
+            &quot;phone&quot;:&quot;18973127715&quot;
+        }
+    }
+}
+
+</code></pre>
+
+<h4 id="toc_13">预定结果处理</h4>
+
+<pre><code class="language-php">    /**
+     * 获取预定结果 方法名 action_set_chb2b_PlaceOrder
+     */
+    private function action_set_chb2b_PlaceOrder(){
+        $airline = $_REQUEST[&#39;airline&#39;];
+        $param = file_get_contents(&quot;php://input&quot;);
+        $json = json_decode($param, true);
+        if ($json){
+            if ($airline==&quot;9c&quot;){ #
+                9C回调处理...
+                echo 0;
+            }else if ($airline==&quot;gs&quot;){
+                GS回调处理...
+                echo 0;
+            }else if ($airline==&quot;aq&quot;){
+                AQ回调处理...
+                echo 0;
+            }
+            ...
+        }
+    }
+</code></pre>
+
+<h4 id="toc_14">支付结果处理</h4>
 
 <pre><code class="language-php">
+    /**
+     * 支付结果
+     */
+    private function action_set_chb2b_Pay(){
+        $airline = $_REQUEST[&#39;airline&#39;];
+        $param = file_get_contents(&quot;php://input&quot;);
+        $json = json_decode($param, true);
+        if ($json){
+            if ($airline==&quot;9c&quot;){ #
+                9C回调处理...
+                echo 0;
+            }else if ($airline==&quot;gs&quot;){
+                GS回调处理...
+                echo 0;
+            }else if ($airline==&quot;aq&quot;){
+                AQ回调处理...
+                echo 0;
+            }
+            ...
+        }
+    }
+    
 </code></pre>
+
+<h4 id="toc_15">获取票号结果处理</h4>
+
+<pre><code class="language-php">
+    /**
+     * 获取票号结果
+     */
+    private function action_set_chb2b_Ticket(){
+        $airline = $_REQUEST[&#39;airline&#39;];
+        $param = file_get_contents(&quot;php://input&quot;);
+        $json = json_decode($param, true);
+        if ($json){
+            if ($airline==&quot;9c&quot;){ #
+                9C回调处理...
+                echo 0;
+            }else if ($airline==&quot;gs&quot;){
+                GS回调处理...
+                echo 0;
+            }else if ($airline==&quot;aq&quot;){
+                AQ回调处理...
+                echo 0;
+            }
+            ...
+        }
+    }
+</code></pre>
+
+<h2 id="toc_16">发送指令修改</h2>
+
+<p>已有平台咨询后台组修改 插入b2b表时发送命令</p>
+
+<p>发送命令方式</p>
+
+<h4 id="toc_17">预定请求接口 POST请求 json参数</h4>
+
+<p>http://{集群对外IP}:31304/{航司二字码}/place</p>
+
+<p>请求json结构参考 <a href="#Reserve">Reserve</a></p>
+
+<h4 id="toc_18">支付请求接口 POST请求 json参数</h4>
+
+<p>http://{集群对外IP}:31304/{航司二字码}/pay</p>
+
+<p>请求json结构参考 <a href="#Payment">Payment</a></p>
+
+<h4 id="toc_19">票号请求接口 POST请求 json参数</h4>
+
+<p>http://{集群对外IP}:31304/{航司二字码}/ticket</p>
+
+<p>请求json结构参考 <a href="#Ticket">Ticket</a></p>
 
 
 </div>
