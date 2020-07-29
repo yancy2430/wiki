@@ -51,8 +51,6 @@
           
             <li><a title="异常状况" href="15953033997720.html">异常状况</a></li>
           
-            <li><a title="预定支付程序核心依赖" href="15946343153789.html">预定支付程序核心依赖</a></li>
-          
 
       
         <li class="divider"></li>
@@ -109,8 +107,6 @@
                           <li><a title="航司预定组件编写示例" href="15957445045908.html">航司预定组件编写示例</a></li>
                         
                           <li><a title="异常状况" href="15953033997720.html">异常状况</a></li>
-                        
-                          <li><a title="预定支付程序核心依赖" href="15946343153789.html">预定支付程序核心依赖</a></li>
                         
 
                     
@@ -171,7 +167,7 @@
 <pre><code class="language-markup">        &lt;dependency&gt;
             &lt;groupId&gt;com.bingo.upup&lt;/groupId&gt;
             &lt;artifactId&gt;place-code-spring-boot-starter&lt;/artifactId&gt;
-            &lt;version&gt;0.1.6&lt;/version&gt;
+            &lt;version&gt;0.2.0&lt;/version&gt;
             &lt;scope&gt;compile&lt;/scope&gt;
         &lt;/dependency&gt;
 </code></pre>
@@ -237,7 +233,11 @@ place.airline=9c #航司二字码
 rocketmq.name-server=192.168.2.54:9876 #rocketmq服务地址
 </code></pre>
 
-<h4 id="toc_4">创建service 并实现预定接口 PlaceListener</h4>
+<h3 id="toc_4">实现接口</h3>
+
+<p><mark>如不需要某个功能 则不要实现其接口 如单预定模块只需要实现预定接口</mark></p>
+
+<h4 id="toc_5">创建service 并实现预定接口 PlaceListener</h4>
 
 <pre><code class="language-java">
 @Service
@@ -251,7 +251,7 @@ public class PlaceServiceImpl implements PlaceListener {
 
 </code></pre>
 
-<h4 id="toc_5"><span id="Reserve">预定参数说明</span></h4>
+<h4 id="toc_6"><span id="Reserve">预定参数说明</span></h4>
 
 <pre><code class="language-java">@ToString
 @Data
@@ -360,7 +360,7 @@ public class Reserve {
 
 </code></pre>
 
-<h4 id="toc_6">创建service 并实现支付接口 PayListener</h4>
+<h4 id="toc_7">创建service 并实现支付接口 PayListener</h4>
 
 <pre><code class="language-java">
 @Service
@@ -374,7 +374,7 @@ public class PayServiceImpl implements PayListener {
 
 </code></pre>
 
-<h4 id="toc_7"><span id="Payment">支付参数说明</span></h4>
+<h4 id="toc_8"><span id="Payment">支付参数说明</span></h4>
 
 <pre><code class="language-java">
 @ToString
@@ -405,7 +405,7 @@ public class Payment {
 
 </code></pre>
 
-<h4 id="toc_8">创建service 并实现获取票号接口 TicketListener</h4>
+<h4 id="toc_9">创建service 并实现获取票号接口 TicketListener</h4>
 
 <pre><code class="language-java">
 @Service
@@ -419,7 +419,7 @@ public class PayServiceImpl implements PayListener {
 
 </code></pre>
 
-<h2 id="toc_9"><span id="Ticket">票号参数实体说明</span></h2>
+<h2 id="toc_10"><span id="Ticket">票号参数实体说明</span></h2>
 
 <pre><code class="language-java">@Data
 @Accessors(chain = true)
@@ -448,11 +448,11 @@ public class Ticket {
 
 </code></pre>
 
-<h1 id="toc_10">后台修改</h1>
+<h1 id="toc_11">后台修改</h1>
 
 <p>在upu跟目录下的bingo_b2b_deal_with.php文件新增接收结果回调通知代码</p>
 
-<h2 id="toc_11">接收结果回调</h2>
+<h2 id="toc_12">接收结果回调</h2>
 
 <p>回调通知地址</p>
 
@@ -469,7 +469,7 @@ http://120.78.91.205:8251/bingo_b2b_deal_with.php?action=set_chb2b_Ticket&amp;ai
 <p>通知地址返回 0 或 HTTP状态200为通知成功 否则失败<br/>
 失败后会重复通知 第一次重复间隔 5秒 第二次 10秒 ... 通知5次 如一直不成功则去MQ查看死信队列</p>
 
-<h4 id="toc_12">统一通知json结构</h4>
+<h4 id="toc_13">统一通知json结构</h4>
 
 <pre><code class="language-javascript">{
     &quot;code&quot;:0,//0 成功 其他为失败 
@@ -497,7 +497,7 @@ http://120.78.91.205:8251/bingo_b2b_deal_with.php?action=set_chb2b_Ticket&amp;ai
 
 </code></pre>
 
-<h4 id="toc_13">预定结果处理</h4>
+<h4 id="toc_14">预定结果处理</h4>
 
 <pre><code class="language-php">    /**
      * 获取预定结果 方法名 action_set_chb2b_PlaceOrder
@@ -522,7 +522,7 @@ http://120.78.91.205:8251/bingo_b2b_deal_with.php?action=set_chb2b_Ticket&amp;ai
     }
 </code></pre>
 
-<h4 id="toc_14">支付结果处理</h4>
+<h4 id="toc_15">支付结果处理</h4>
 
 <pre><code class="language-php">
     /**
@@ -549,7 +549,7 @@ http://120.78.91.205:8251/bingo_b2b_deal_with.php?action=set_chb2b_Ticket&amp;ai
     
 </code></pre>
 
-<h4 id="toc_15">获取票号结果处理</h4>
+<h4 id="toc_16">获取票号结果处理</h4>
 
 <pre><code class="language-php">
     /**
@@ -575,25 +575,25 @@ http://120.78.91.205:8251/bingo_b2b_deal_with.php?action=set_chb2b_Ticket&amp;ai
     }
 </code></pre>
 
-<h2 id="toc_16">发送指令修改</h2>
+<h2 id="toc_17">发送指令修改</h2>
 
 <p>已有平台咨询后台组修改 插入b2b表时发送命令</p>
 
 <p>发送命令方式</p>
 
-<h4 id="toc_17">预定请求接口 POST请求 json参数</h4>
+<h4 id="toc_18">预定请求接口 POST请求 json参数</h4>
 
 <p>http://{集群对外IP}:31304/{航司二字码}/place</p>
 
 <p>请求json结构参考 <a href="#Reserve">Reserve</a></p>
 
-<h4 id="toc_18">支付请求接口 POST请求 json参数</h4>
+<h4 id="toc_19">支付请求接口 POST请求 json参数</h4>
 
 <p>http://{集群对外IP}:31304/{航司二字码}/pay</p>
 
 <p>请求json结构参考 <a href="#Payment">Payment</a></p>
 
-<h4 id="toc_19">票号请求接口 POST请求 json参数</h4>
+<h4 id="toc_20">票号请求接口 POST请求 json参数</h4>
 
 <p>http://{集群对外IP}:31304/{航司二字码}/ticket</p>
 
