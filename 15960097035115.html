@@ -47,9 +47,9 @@
         <li><label>新框架开发</label></li>
 
           
-            <li><a title="航司预定组件编写示例" href="15957445045908.html">航司预定组件编写示例</a></li>
-          
             <li><a title="如何一个自动集成部署的项目" href="15960097035115.html">如何一个自动集成部署的项目</a></li>
+          
+            <li><a title="航司预定组件编写示例" href="15957445045908.html">航司预定组件编写示例</a></li>
           
             <li><a title="异常状况" href="15953033997720.html">异常状况</a></li>
           
@@ -98,9 +98,9 @@
                     
                       <li class="side-title"><span>新框架开发</span></li>
                         
-                          <li><a title="航司预定组件编写示例" href="15957445045908.html">航司预定组件编写示例</a></li>
-                        
                           <li><a title="如何一个自动集成部署的项目" href="15960097035115.html">如何一个自动集成部署的项目</a></li>
+                        
+                          <li><a title="航司预定组件编写示例" href="15957445045908.html">航司预定组件编写示例</a></li>
                         
                           <li><a title="异常状况" href="15953033997720.html">异常状况</a></li>
                         
@@ -138,6 +138,132 @@
  <div class="markdown-body">
 <h1>如何一个自动集成部署的项目</h1>
 
+<h2 id="toc_0">在项目中添加打包插件</h2>
+
+<p>在pom文件中添加</p>
+
+<pre><code class="language-markup">&lt;build&gt;
+        &lt;plugins&gt;
+            &lt;plugin&gt;
+                &lt;groupId&gt;org.springframework.boot&lt;/groupId&gt;
+                &lt;artifactId&gt;spring-boot-maven-plugin&lt;/artifactId&gt;
+            &lt;/plugin&gt;
+            &lt;plugin&gt;
+                &lt;groupId&gt;com.spotify&lt;/groupId&gt;
+                &lt;artifactId&gt;docker-maven-plugin&lt;/artifactId&gt;
+                &lt;version&gt;1.2.0&lt;/version&gt;
+                &lt;executions&gt;
+                    &lt;!--执行 mvn package 时 自动 执行 mvn docker:build--&gt;
+                    &lt;execution&gt;
+                        &lt;id&gt;build-image&lt;/id&gt;
+                        &lt;phase&gt;package&lt;/phase&gt;
+                        &lt;goals&gt;
+                            &lt;goal&gt;build&lt;/goal&gt;
+                            &lt;!--&lt;goal&gt;push&lt;/goal&gt;--&gt;
+                        &lt;/goals&gt;
+                    &lt;/execution&gt;
+                &lt;/executions&gt;
+                &lt;configuration&gt;
+                    &lt;serverId&gt;docker-hub&lt;/serverId&gt;
+                    &lt;!--镜像名称--&gt;
+                    &lt;baseImage&gt;adoptopenjdk/openjdk11&lt;/baseImage&gt;
+                    &lt;imageName&gt;registry-vpc.cn-shenzhen.aliyuncs.com/phanpy/${project.name}&lt;/imageName&gt;
+                    &lt;image&gt;${project.artifactId}&lt;/image&gt;
+                    &lt;imageTags&gt;
+                        &lt;imageTag&gt;${project.version}&lt;/imageTag&gt;
+                        &lt;imageTag&gt;latest&lt;/imageTag&gt;
+                    &lt;/imageTags&gt;
+                    &lt;env&gt;
+                        &lt;TZ&gt;Asia/Shanghai&lt;/TZ&gt;
+                        &lt;ACTIVE&gt;test&lt;/ACTIVE&gt;
+                    &lt;/env&gt;
+                    &lt;cmd&gt;java -jar -Dspring.profiles.active=$ACTIVE ${project.build.finalName}.jar&lt;/cmd&gt;
+                    &lt;resources&gt;
+                        &lt;resource&gt;
+                            &lt;!-- 编译jar路径 --&gt;
+                            &lt;!--&lt;targetPath&gt;/&lt;/targetPath&gt;--&gt;
+                            &lt;!--编译jar 所在文件夹--&gt;
+                            &lt;directory&gt;${project.build.directory}&lt;/directory&gt;
+                            &lt;!--编译的jar 名称--&gt;
+                            &lt;include&gt;${project.name}-${project.version}.jar&lt;/include&gt;
+                        &lt;/resource&gt;
+                    &lt;/resources&gt;
+                &lt;/configuration&gt;
+            &lt;/plugin&gt;
+        &lt;/plugins&gt;
+    &lt;/build&gt;
+</code></pre>
+
+<h2 id="toc_1">在gitlab创建项目</h2>
+
+<p>gitlab 地址 <a href="https://gitlab.xiangshangsl.com/">https://gitlab.xiangshangsl.com/</a></p>
+
+<h3 id="toc_2">1. 在gitlab上创建一个项目</h3>
+
+<p><img src="media/15960097035115/15960805428975.jpg" alt="" style="width:1292px;"/></p>
+
+<h3 id="toc_3">2. 创建一个新内部项目</h3>
+
+<p><mark>需要根据类型选择群组</mark><br/>
+<img src="media/15960097035115/15960807266311.jpg" alt="" style="width:952px;"/></p>
+
+<h3 id="toc_4">3. 创建成功后根据提示 推送项目到git</h3>
+
+<p><img src="media/15960097035115/15960807818798.jpg" alt="" style="width:1326px;"/></p>
+
+<p>如上传失败 提示无权限 <br/>
+<img src="media/15960097035115/15960808306165.jpg" alt="" style="width:1122px;"/><br/>
+添加用户权限到项目<br/>
+<img src="media/15960097035115/15960808513558.jpg" alt="" style="width:1302px;"/></p>
+
+<p>再进行上传</p>
+
+<h2 id="toc_5">添加jenkins打包任务</h2>
+
+<p>地址 <a href="http://jenkins.cloud.xiangshangsl.com/">http://jenkins.cloud.xiangshangsl.com/</a></p>
+
+<h3 id="toc_6">新建任务</h3>
+
+<p><img src="media/15960097035115/15960811464594.jpg" alt="" style="width:1549px;"/></p>
+
+<p><img src="media/15960097035115/15960812265833.jpg" alt="" style="width:1194px;"/><br/>
+打开gitlab的项目地址 获取到git地址<br/>
+<img src="media/15960097035115/15960812473593.jpg" alt="" style="width:1050px;"/><br/>
+填入下图的位置<br/>
+<img src="media/15960097035115/15960813085757.jpg" alt="" style="width:1540px;"/></p>
+
+<p>构建触发器点击高级选项</p>
+
+<p><img src="media/15960097035115/15960813520148.jpg" alt="" style="width:1434px;"/><br/>
+先复制webhook地址<br/>
+<img src="media/15960097035115/15960815285384.jpg" alt="" style="width:1435px;"/></p>
+
+<p>然后点下图的按钮 重新生成一个token 并复制出来<br/>
+<img src="media/15960097035115/15960813728612.jpg" alt="" style="width:1451px;"/></p>
+
+<p>再打开gitlab项目地址<br/>
+<img src="media/15960097035115/15960814566754.jpg" alt="" style="width:618px;"/><br/>
+点击集成 然后填入上面获取的URL和token<br/>
+<img src="media/15960097035115/15960815754731.jpg" alt="" style="width:1166px;"/></p>
+
+<p><img src="media/15960097035115/15960816296626.jpg" alt="" style="width:853px;"/></p>
+
+<h3 id="toc_7">集成k8s</h3>
+
+<p>打开k8s的项目 点击CI/CD集成<br/>
+<img src="media/15960097035115/15960817645929.jpg" alt="" style="width:1022px;"/></p>
+
+<p>复制出删除pod的脚本 <br/>
+<img src="media/15960097035115/15960817833754.jpg" alt="" style="width:1630px;"/><br/>
+粘贴到下面框里<br/>
+<img src="media/15960097035115/15960818218746.jpg" alt="" style="width:1506px;"/><br/>
+然后保存 并应用<br/>
+<img src="media/15960097035115/15960818431151.jpg" alt="" style="width:1241px;"/></p>
+
+<h3 id="toc_8">最就是提交一次代码到git 然后打开jenkins 查看打包是否在执行</h3>
+
+<p><a href="http://jenkins.cloud.xiangshangsl.com/">http://jenkins.cloud.xiangshangsl.com/</a><br/>
+<img src="media/15960097035115/15960819015414.jpg" alt="" style="width:1044px;"/></p>
 
 
 </div>
@@ -149,15 +275,13 @@
   <div class="large-6 columns">
 	<div class="text-left" style="padding:15px 0px;">
 		
-	        <a href="15957445045908.html"  title="Previous Post: 航司预定组件编写示例">&laquo; 航司预定组件编写示例</a>
-	    
 	</div>
   </div>
   <div class="large-6 columns">
 	<div class="text-right" style="padding:15px 0px;">
 		
-	        <a href="15953033997720.html" 
-	        title="Next Post: 异常状况">异常状况 &raquo;</a>
+	        <a href="15957445045908.html" 
+	        title="Next Post: 航司预定组件编写示例">航司预定组件编写示例 &raquo;</a>
 	    
 	</div>
   </div>
@@ -216,6 +340,8 @@ Theme used <a target="_blank" href="http://github.com">GitHub CSS</a>.</p>
 
 
 
+
+<script src="asset/prism.js"></script>
 
 
 <style type="text/css">
