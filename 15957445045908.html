@@ -47,9 +47,9 @@
         <li><label>新框架开发</label></li>
 
           
-            <li><a title="配置项目自动集成打包部署" href="15960097035115.html">配置项目自动集成打包部署</a></li>
-          
             <li><a title="航司预定组件编写示例" href="15957445045908.html">航司预定组件编写示例</a></li>
+          
+            <li><a title="配置项目自动集成打包部署" href="15960097035115.html">配置项目自动集成打包部署</a></li>
           
             <li><a title="异常状况" href="15953033997720.html">异常状况</a></li>
           
@@ -98,9 +98,9 @@
                     
                       <li class="side-title"><span>新框架开发</span></li>
                         
-                          <li><a title="配置项目自动集成打包部署" href="15960097035115.html">配置项目自动集成打包部署</a></li>
-                        
                           <li><a title="航司预定组件编写示例" href="15957445045908.html">航司预定组件编写示例</a></li>
+                        
+                          <li><a title="配置项目自动集成打包部署" href="15960097035115.html">配置项目自动集成打包部署</a></li>
                         
                           <li><a title="异常状况" href="15953033997720.html">异常状况</a></li>
                         
@@ -369,7 +369,33 @@ public class Reserve {
 
 </code></pre>
 
-<h4 id="toc_10">创建service 并实现支付接口 PayListener</h4>
+<h4 id="toc_10">回调结果参数说明</h4>
+
+<pre><code class="language-java">
+@Data
+@Accessors(chain = true)
+public class R&lt;T&gt; implements Serializable {
+ /**
+     * 结果code 0, &quot;处理成功&quot; 1, &quot;可以重试&quot; 2, &quot;不可重试&quot; 3, &quot;换号重试&quot;
+     */
+    private int code;
+    /**
+     * 结果集 航司返回原文 后台根据结果解析
+     */
+    private T data;
+    /**
+     * 错误描述
+     */
+    private String msg;
+
+    /**
+     * 请求参数原文返回
+     */
+    private Object param;
+}
+</code></pre>
+
+<h4 id="toc_11">创建service 并实现支付接口 PayListener</h4>
 
 <pre><code class="language-java">
 @Service
@@ -383,7 +409,7 @@ public class PayServiceImpl implements PayListener&lt;Map&lt;String,String&gt;&g
 
 </code></pre>
 
-<h4 id="toc_11"><span id="Payment">支付参数说明</span></h4>
+<h4 id="toc_12"><span id="Payment">支付参数说明</span></h4>
 
 <pre><code class="language-java">
 @ToString
@@ -414,7 +440,7 @@ public class Payment {
 
 </code></pre>
 
-<h4 id="toc_12">创建service 并实现获取票号接口 TicketListener</h4>
+<h4 id="toc_13">创建service 并实现获取票号接口 TicketListener</h4>
 
 <pre><code class="language-java">
 @Service
@@ -428,7 +454,7 @@ public class TicketServiceImpl implements TicketListener&lt;Map&lt;String,String
 
 </code></pre>
 
-<h2 id="toc_13"><span id="Ticket">票号参数实体说明</span></h2>
+<h2 id="toc_14"><span id="Ticket">票号参数实体说明</span></h2>
 
 <pre><code class="language-java">@Data
 @Accessors(chain = true)
@@ -457,7 +483,7 @@ public class Ticket {
 
 </code></pre>
 
-<h2 id="toc_14">异常处理</h2>
+<h2 id="toc_15">异常处理</h2>
 
 <p><strong><mark>下单过程异常中断统一抛出异常</mark></strong></p>
 
@@ -481,7 +507,7 @@ public enum ResultEnum {
 }
 </code></pre>
 
-<h2 id="toc_15">测试用例</h2>
+<h2 id="toc_16">测试用例</h2>
 
 <p>在test文件夹创建测试用例</p>
 
@@ -531,11 +557,11 @@ class GsApplicationTests {
     ...
 </code></pre>
 
-<h1 id="toc_16">后台修改</h1>
+<h1 id="toc_17">后台修改</h1>
 
 <p>在upu跟目录下的bingo_b2b_deal_with.php文件新增接收结果回调通知代码</p>
 
-<h2 id="toc_17">接收结果回调</h2>
+<h2 id="toc_18">接收结果回调</h2>
 
 <p>回调通知地址</p>
 
@@ -552,7 +578,7 @@ http://120.78.91.205:8251/bingo_b2b_deal_with.php?action=set_chb2b_Ticket&amp;ai
 <p>通知地址返回 0 或 HTTP状态200为通知成功 否则失败<br/>
 失败后会重复通知 第一次重复间隔 5秒 第二次 10秒 ... 通知5次 如一直不成功则去MQ查看死信队列</p>
 
-<h4 id="toc_18">统一通知json结构</h4>
+<h4 id="toc_19">统一通知json结构</h4>
 
 <pre><code class="language-javascript">{
     &quot;code&quot;:0,//0 成功 其他为失败 
@@ -580,7 +606,7 @@ http://120.78.91.205:8251/bingo_b2b_deal_with.php?action=set_chb2b_Ticket&amp;ai
 
 </code></pre>
 
-<h4 id="toc_19">预定结果处理</h4>
+<h4 id="toc_20">预定结果处理</h4>
 
 <pre><code class="language-php">    /**
      * 获取预定结果 方法名 action_set_chb2b_PlaceOrder
@@ -605,7 +631,7 @@ http://120.78.91.205:8251/bingo_b2b_deal_with.php?action=set_chb2b_Ticket&amp;ai
     }
 </code></pre>
 
-<h4 id="toc_20">支付结果处理</h4>
+<h4 id="toc_21">支付结果处理</h4>
 
 <pre><code class="language-php">
     /**
@@ -632,7 +658,7 @@ http://120.78.91.205:8251/bingo_b2b_deal_with.php?action=set_chb2b_Ticket&amp;ai
     
 </code></pre>
 
-<h4 id="toc_21">获取票号结果处理</h4>
+<h4 id="toc_22">获取票号结果处理</h4>
 
 <pre><code class="language-php">
     /**
@@ -658,25 +684,25 @@ http://120.78.91.205:8251/bingo_b2b_deal_with.php?action=set_chb2b_Ticket&amp;ai
     }
 </code></pre>
 
-<h2 id="toc_22">发送指令修改</h2>
+<h2 id="toc_23">发送指令修改</h2>
 
 <p>已有平台咨询后台组修改 插入b2b表时发送命令</p>
 
 <p>发送命令方式</p>
 
-<h4 id="toc_23">预定请求接口 POST请求 json参数</h4>
+<h4 id="toc_24">预定请求接口 POST请求 json参数</h4>
 
 <p>http://{集群对外IP}:31304/{航司二字码}/place</p>
 
 <p>请求json结构参考 <a href="#Reserve">Reserve</a></p>
 
-<h4 id="toc_24">支付请求接口 POST请求 json参数</h4>
+<h4 id="toc_25">支付请求接口 POST请求 json参数</h4>
 
 <p>http://{集群对外IP}:31304/{航司二字码}/pay</p>
 
 <p>请求json结构参考 <a href="#Payment">Payment</a></p>
 
-<h4 id="toc_25">票号请求接口 POST请求 json参数</h4>
+<h4 id="toc_26">票号请求接口 POST请求 json参数</h4>
 
 <p>http://{集群对外IP}:31304/{航司二字码}/ticket</p>
 
@@ -692,15 +718,13 @@ http://120.78.91.205:8251/bingo_b2b_deal_with.php?action=set_chb2b_Ticket&amp;ai
   <div class="large-6 columns">
 	<div class="text-left" style="padding:15px 0px;">
 		
-	        <a href="15960097035115.html"  title="Previous Post: 配置项目自动集成打包部署">&laquo; 配置项目自动集成打包部署</a>
-	    
 	</div>
   </div>
   <div class="large-6 columns">
 	<div class="text-right" style="padding:15px 0px;">
 		
-	        <a href="15953033997720.html" 
-	        title="Next Post: 异常状况">异常状况 &raquo;</a>
+	        <a href="15960097035115.html" 
+	        title="Next Post: 配置项目自动集成打包部署">配置项目自动集成打包部署 &raquo;</a>
 	    
 	</div>
   </div>
