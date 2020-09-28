@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>
     
-  异常状况 - 新框架文档站
+  搭建Kubernetes和Kuboard控制面板 - 新框架文档站
   
   </title>
  <meta name="description" content="新框架文档">
@@ -47,11 +47,15 @@
         <li><label>新框架开发</label></li>
 
           
+            <li><a title="基础环境依赖安装" href="16010210468178.html">基础环境依赖安装</a></li>
+          
+            <li><a title="Centos下创建NFS储存类型" href="16010201436052.html">Centos下创建NFS储存类型</a></li>
+          
+            <li><a title="搭建Kubernetes和Kuboard控制面板" href="15953033997720.html">搭建Kubernetes和Kuboard控制面板</a></li>
+          
             <li><a title="航司预定组件编写示例" href="15957445045908.html">航司预定组件编写示例</a></li>
           
             <li><a title="配置项目自动集成打包部署" href="15960097035115.html">配置项目自动集成打包部署</a></li>
-          
-            <li><a title="异常状况" href="15953033997720.html">异常状况</a></li>
           
 
       
@@ -98,11 +102,15 @@
                     
                       <li class="side-title"><span>新框架开发</span></li>
                         
+                          <li><a title="基础环境依赖安装" href="16010210468178.html">基础环境依赖安装</a></li>
+                        
+                          <li><a title="Centos下创建NFS储存类型" href="16010201436052.html">Centos下创建NFS储存类型</a></li>
+                        
+                          <li><a title="搭建Kubernetes和Kuboard控制面板" href="15953033997720.html">搭建Kubernetes和Kuboard控制面板</a></li>
+                        
                           <li><a title="航司预定组件编写示例" href="15957445045908.html">航司预定组件编写示例</a></li>
                         
                           <li><a title="配置项目自动集成打包部署" href="15960097035115.html">配置项目自动集成打包部署</a></li>
-                        
-                          <li><a title="异常状况" href="15953033997720.html">异常状况</a></li>
                         
 
                     
@@ -136,11 +144,293 @@
             <div class="large-9 medium-9 columns">
 
  <div class="markdown-body">
-<h1>异常状况</h1>
+<h1>搭建Kubernetes和Kuboard控制面板</h1>
 
-<h3 id="toc_0">内网无法通过别名访问的异常</h3>
+<h2 id="toc_0">安装docker及kubelet</h2>
 
-<p>排查system别名里的codeDNS服务是不是死了 或者部署位置不一样</p>
+<p>使用 root 身份在 <strong>所有节点</strong> 执行如下代码，以安装软件：</p>
+
+<ul>
+<li>docker</li>
+<li>nfs-utils</li>
+<li>kubectl / kubeadm / kubelet</li>
+</ul>
+
+<pre><code class="language-shell"># 在 master 节点和 worker 节点都要执行
+# 最后一个参数 1.19.2 用于指定 kubenetes 版本，支持所有 1.19.x 版本的安装
+# 腾讯云 docker hub 镜像
+# export REGISTRY_MIRROR=&quot;https://mirror.ccs.tencentyun.com&quot;
+# DaoCloud 镜像
+# export REGISTRY_MIRROR=&quot;http://f1361db2.m.daocloud.io&quot;
+# 阿里云 docker hub 镜像
+export REGISTRY_MIRROR=https://registry.cn-hangzhou.aliyuncs.com
+
+# 在 master 节点和 worker 节点都要执行
+
+# 安装 docker
+# 参考文档如下
+# https://docs.docker.com/install/linux/docker-ce/centos/ 
+# https://docs.docker.com/install/linux/linux-postinstall/
+
+# 卸载旧版本
+yum remove -y docker \
+docker-client \
+docker-client-latest \
+docker-ce-cli \
+docker-common \
+docker-latest \
+docker-latest-logrotate \
+docker-logrotate \
+docker-selinux \
+docker-engine-selinux \
+docker-engine
+
+# 设置 yum repository
+yum install -y yum-utils \
+device-mapper-persistent-data \
+lvm2
+yum-config-manager --add-repo http://mirrors.aliyun.com/docker-ce/linux/centos/docker-ce.repo
+
+# 安装并启动 docker
+yum install -y docker-ce-19.03.11 docker-ce-cli-19.03.11 containerd.io-1.2.13
+
+mkdir /etc/docker || true
+
+cat &gt; /etc/docker/daemon.json &lt;&lt;EOF
+{
+  &quot;registry-mirrors&quot;: [&quot;${REGISTRY_MIRROR}&quot;],
+  &quot;exec-opts&quot;: [&quot;native.cgroupdriver=systemd&quot;],
+  &quot;log-driver&quot;: &quot;json-file&quot;,
+  &quot;log-opts&quot;: {
+    &quot;max-size&quot;: &quot;100m&quot;
+  },
+  &quot;storage-driver&quot;: &quot;overlay2&quot;,
+  &quot;storage-opts&quot;: [
+    &quot;overlay2.override_kernel_check=true&quot;
+  ]
+}
+EOF
+
+mkdir -p /etc/systemd/system/docker.service.d
+
+# Restart Docker
+systemctl daemon-reload
+systemctl enable docker
+systemctl restart docker
+
+# 安装 nfs-utils
+# 必须先安装 nfs-utils 才能挂载 nfs 网络存储
+yum install -y nfs-utils
+yum install -y wget
+
+# 关闭 防火墙
+systemctl stop firewalld
+systemctl disable firewalld
+
+# 关闭 SeLinux
+setenforce 0
+sed -i &quot;s/SELINUX=enforcing/SELINUX=disabled/g&quot; /etc/selinux/config
+
+# 关闭 swap
+swapoff -a
+yes | cp /etc/fstab /etc/fstab_bak
+cat /etc/fstab_bak |grep -v swap &gt; /etc/fstab
+
+# 修改 /etc/sysctl.conf
+# 如果有配置，则修改
+sed -i &quot;s#^net.ipv4.ip_forward.*#net.ipv4.ip_forward=1#g&quot;  /etc/sysctl.conf
+sed -i &quot;s#^net.bridge.bridge-nf-call-ip6tables.*#net.bridge.bridge-nf-call-ip6tables=1#g&quot;  /etc/sysctl.conf
+sed -i &quot;s#^net.bridge.bridge-nf-call-iptables.*#net.bridge.bridge-nf-call-iptables=1#g&quot;  /etc/sysctl.conf
+sed -i &quot;s#^net.ipv6.conf.all.disable_ipv6.*#net.ipv6.conf.all.disable_ipv6=1#g&quot;  /etc/sysctl.conf
+sed -i &quot;s#^net.ipv6.conf.default.disable_ipv6.*#net.ipv6.conf.default.disable_ipv6=1#g&quot;  /etc/sysctl.conf
+sed -i &quot;s#^net.ipv6.conf.lo.disable_ipv6.*#net.ipv6.conf.lo.disable_ipv6=1#g&quot;  /etc/sysctl.conf
+sed -i &quot;s#^net.ipv6.conf.all.forwarding.*#net.ipv6.conf.all.forwarding=1#g&quot;  /etc/sysctl.conf
+# 可能没有，追加
+echo &quot;net.ipv4.ip_forward = 1&quot; &gt;&gt; /etc/sysctl.conf
+echo &quot;net.bridge.bridge-nf-call-ip6tables = 1&quot; &gt;&gt; /etc/sysctl.conf
+echo &quot;net.bridge.bridge-nf-call-iptables = 1&quot; &gt;&gt; /etc/sysctl.conf
+echo &quot;net.ipv6.conf.all.disable_ipv6 = 1&quot; &gt;&gt; /etc/sysctl.conf
+echo &quot;net.ipv6.conf.default.disable_ipv6 = 1&quot; &gt;&gt; /etc/sysctl.conf
+echo &quot;net.ipv6.conf.lo.disable_ipv6 = 1&quot; &gt;&gt; /etc/sysctl.conf
+echo &quot;net.ipv6.conf.all.forwarding = 1&quot;  &gt;&gt; /etc/sysctl.conf
+# 执行命令以应用
+sysctl -p
+
+# 配置K8S的yum源
+cat &lt;&lt;EOF &gt; /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=http://mirrors.aliyun.com/kubernetes/yum/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=0
+repo_gpgcheck=0
+gpgkey=http://mirrors.aliyun.com/kubernetes/yum/doc/yum-key.gpg
+       http://mirrors.aliyun.com/kubernetes/yum/doc/rpm-package-key.gpg
+EOF
+
+# 卸载旧版本
+yum remove -y kubelet kubeadm kubectl
+
+# 安装kubelet、kubeadm、kubectl
+# 将 ${1} 替换为 kubernetes 版本号，例如 1.19.0
+yum install -y kubelet-${1} kubeadm-${1} kubectl-${1}
+
+# 重启 docker，并启动 kubelet
+systemctl daemon-reload
+systemctl restart docker
+systemctl enable kubelet &amp;&amp; systemctl start kubelet
+
+docker version
+
+</code></pre>
+
+<blockquote>
+<p>WARNING<br/>
+如果此时执行 service status kubelet 命令，将得到 kubelet 启动失败的错误提示，请忽略此错误，因为必须完成后续步骤中 kubeadm init 的操作，kubelet 才能正常启动</p>
+</blockquote>
+
+<h2 id="toc_1">初始化 master 节点</h2>
+
+<blockquote>
+<p>关于初始化时用到的环境变量</p>
+
+<ul>
+<li>APISERVER_NAME 不能是 master 的 hostname</li>
+<li>APISERVER_NAME 必须全为小写字母、数字、小数点，不能包含减号</li>
+<li>POD_SUBNET 所使用的网段不能与 master节点/worker节点 所在的网段重叠。该字段的取值为一个 CIDR 值，如果您对 CIDR 这个概念还不熟悉，请仍然执行 export POD_SUBNET=10.100.0.1/16 命令，不做修改</li>
+</ul>
+</blockquote>
+
+<pre><code class="language-shell"># 只在 master 节点执行
+# 替换 x.x.x.x 为 master 节点的内网IP
+# export 命令只在当前 shell 会话中有效，开启新的 shell 窗口后，如果要继续安装过程，请重新执行此处的 export 命令
+export MASTER_IP=x.x.x.x
+# 替换 apiserver.demo 为 您想要的 dnsName
+export APISERVER_NAME=apiserver.demo
+# Kubernetes 容器组所在的网段，该网段安装完成后，由 kubernetes 创建，事先并不存在于您的物理网络中
+export POD_SUBNET=10.100.0.1/16
+echo &quot;${MASTER_IP}    ${APISERVER_NAME}&quot; &gt;&gt; /etc/hosts
+
+
+# 只在 master 节点执行
+
+# 脚本出错时终止执行
+set -e
+
+if [ ${#POD_SUBNET} -eq 0 ] || [ ${#APISERVER_NAME} -eq 0 ]; then
+  echo -e &quot;\033[31;1m请确保您已经设置了环境变量 POD_SUBNET 和 APISERVER_NAME \033[0m&quot;
+  echo 当前POD_SUBNET=$POD_SUBNET
+  echo 当前APISERVER_NAME=$APISERVER_NAME
+  exit 1
+fi
+
+
+# 查看完整配置选项 https://godoc.org/k8s.io/kubernetes/cmd/kubeadm/app/apis/kubeadm/v1beta2
+rm -f ./kubeadm-config.yaml
+cat &lt;&lt;EOF &gt; ./kubeadm-config.yaml
+apiVersion: kubeadm.k8s.io/v1beta2
+kind: ClusterConfiguration
+kubernetesVersion: v${1}
+imageRepository: registry.aliyuncs.com/k8sxio
+controlPlaneEndpoint: &quot;${APISERVER_NAME}:6443&quot;
+networking:
+  serviceSubnet: &quot;10.96.0.0/16&quot;
+  podSubnet: &quot;${POD_SUBNET}&quot;
+  dnsDomain: &quot;cluster.local&quot;
+EOF
+
+# kubeadm init
+# 根据您服务器网速的情况，您需要等候 3 - 10 分钟
+kubeadm init --config=kubeadm-config.yaml --upload-certs
+
+# 配置 kubectl
+rm -rf /root/.kube/
+mkdir /root/.kube/
+cp -i /etc/kubernetes/admin.conf /root/.kube/config
+
+# 安装 calico 网络插件
+# 参考文档 https://docs.projectcalico.org/v3.13/getting-started/kubernetes/self-managed-onprem/onpremises
+echo &quot;安装calico-3.13.1&quot;
+rm -f calico-3.13.1.yaml
+wget https://kuboard.cn/install-script/calico/calico-3.13.1.yaml
+kubectl apply -f calico-3.13.1.yaml
+
+
+# 只在 master 节点执行
+
+# 执行如下命令，等待 3-10 分钟，直到所有的容器组处于 Running 状态
+watch kubectl get pod -n kube-system -o wide
+
+# 查看 master 节点初始化结果
+kubectl get nodes -o wide
+
+</code></pre>
+
+<h2 id="toc_2">初始化 worker节点</h2>
+
+<h3 id="toc_3">获得 join命令参数</h3>
+
+<p>在 master 节点上执行</p>
+
+<pre><code class="language-shell"># 只在 master 节点执行
+kubeadm token create --print-join-command
+</code></pre>
+
+<p>可获取kubeadm join 命令及参数，如下所示</p>
+
+<pre><code class="language-shell"># kubeadm token create 命令的输出
+kubeadm join apiserver.demo:6443 --token mpfjma.4vjjg8flqihor4vt     --discovery-token-ca-cert-hash sha256:6f7a8e40a810323672de5eee6f4d19aa2dbdb38411845a1bf5dd63485c43d303
+</code></pre>
+
+<blockquote>
+<p><strong>有效时间</strong><br/>
+该 token 的有效时间为 2 个小时，2小时内，您可以使用此 token 初始化任意数量的 worker 节点。</p>
+</blockquote>
+
+<h3 id="toc_4">初始化worker</h3>
+
+<p>针对所有的 worker 节点执行</p>
+
+<pre><code class="language-shell"># 只在 worker 节点执行
+# 替换 x.x.x.x 为 master 节点的内网 IP
+export MASTER_IP=x.x.x.x
+# 替换 apiserver.demo 为初始化 master 节点时所使用的 APISERVER_NAME
+export APISERVER_NAME=apiserver.demo
+echo &quot;${MASTER_IP}    ${APISERVER_NAME}&quot; &gt;&gt; /etc/hosts
+# 替换为 master 节点上 kubeadm token create 命令的输出
+kubeadm join apiserver.demo:6443 --token mpfjma.4vjjg8flqihor4vt     --discovery-token-ca-cert-hash sha256:6f7a8e40a810323672de5eee6f4d19aa2dbdb38411845a1bf5dd63485c43d303
+
+</code></pre>
+
+<h3 id="toc_5">检查初始化结果</h3>
+
+<p>在 master 节点上执行</p>
+
+<pre><code class="language-shell"># 只在 master 节点执行
+kubectl get nodes -o wide
+# 输出结果如下所示：
+[root@demo-master-a-1 ~]# kubectl get nodes
+NAME     STATUS   ROLES    AGE     VERSION
+demo-master-a-1   Ready    master   5m3s    v1.19.x
+demo-worker-a-1   Ready    &lt;none&gt;   2m26s   v1.19.x
+demo-worker-a-2   Ready    &lt;none&gt;   3m56s   v1.19.x
+</code></pre>
+
+<h2 id="toc_6">安装 Ingress Controller</h2>
+
+<p>在 master 节点上执行</p>
+
+<pre><code class="language-shell"># 只在 master 节点执行
+kubectl apply -f https://kuboard.cn/install-script/v1.19.x/nginx-ingress.yaml
+</code></pre>
+
+<h2 id="toc_7">安装有问题可以参考kuboard的安装教程</h2>
+
+<p><a href="https://www.kuboard.cn/install/install-k8s.html">https://www.kuboard.cn/install/install-k8s.html</a></p>
+
+<h2 id="toc_8">程序部署和使用教程看这里</h2>
+
+<p><a href="https://www.kuboard.cn/learning/">https://www.kuboard.cn/learning/</a></p>
 
 
 </div>
@@ -152,15 +442,15 @@
   <div class="large-6 columns">
 	<div class="text-left" style="padding:15px 0px;">
 		
-	        <a href="15960097035115.html"  title="Previous Post: 配置项目自动集成打包部署">&laquo; 配置项目自动集成打包部署</a>
+	        <a href="16010201436052.html"  title="Previous Post: Centos下创建NFS储存类型">&laquo; Centos下创建NFS储存类型</a>
 	    
 	</div>
   </div>
   <div class="large-6 columns">
 	<div class="text-right" style="padding:15px 0px;">
 		
-	        <a href="15933940503644.html" 
-	        title="Next Post: KVM 安装过程">KVM 安装过程 &raquo;</a>
+	        <a href="15957445045908.html" 
+	        title="Next Post: 航司预定组件编写示例">航司预定组件编写示例 &raquo;</a>
 	    
 	</div>
   </div>
@@ -219,6 +509,8 @@ Theme used <a target="_blank" href="http://github.com">GitHub CSS</a>.</p>
 
 
 
+
+<script src="asset/prism.js"></script>
 
 
 <style type="text/css">
